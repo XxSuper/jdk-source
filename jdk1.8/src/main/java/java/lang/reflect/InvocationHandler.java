@@ -46,20 +46,20 @@ public interface InvocationHandler {
      * when a method is invoked on a proxy instance that it is
      * associated with.
      *
-     * @param   proxy the proxy instance that the method was invoked on
+     * @param   proxy the proxy instance that the method was invoked on 代理类
      *
      * @param   method the {@code Method} instance corresponding to
      * the interface method invoked on the proxy instance.  The declaring
      * class of the {@code Method} object will be the interface that
      * the method was declared in, which may be a superinterface of the
-     * proxy interface that the proxy class inherits the method through.
+     * proxy interface that the proxy class inherits the method through. 被代理的方法
      *
      * @param   args an array of objects containing the values of the
      * arguments passed in the method invocation on the proxy instance,
      * or {@code null} if interface method takes no arguments.
      * Arguments of primitive types are wrapped in instances of the
      * appropriate primitive wrapper class, such as
-     * {@code java.lang.Integer} or {@code java.lang.Boolean}.
+     * {@code java.lang.Integer} or {@code java.lang.Boolean}. 方法的参数数组
      *
      * @return  the value to return from the method invocation on the
      * proxy instance.  If the declared return type of the interface

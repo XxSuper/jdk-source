@@ -222,7 +222,7 @@ import sun.security.util.SecurityConstants;
  * successfully by the {@code invoke} method.
  *
  * @author      Peter Jones
- * @see         InvocationHandler
+ * @see         InvocationHandler 动态代理类
  * @since       1.3
  */
 public class Proxy implements java.io.Serializable {
@@ -235,6 +235,7 @@ public class Proxy implements java.io.Serializable {
 
     /**
      * a cache of proxy classes
+     * K代表key值，P代表参数，V代表存储的值
      */
     private static final WeakCache<ClassLoader, Class<?>[], Class<?>>
         proxyClassCache = new WeakCache<>(new KeyFactory(), new ProxyClassFactory());
@@ -254,7 +255,7 @@ public class Proxy implements java.io.Serializable {
     /**
      * Constructs a new {@code Proxy} instance from a subclass
      * (typically, a dynamic proxy class) with the specified value
-     * for its invocation handler.
+     * for its invocation handler. 用于给内部的InvocationHandler h属性赋值
      *
      * @param  h the invocation handler for this proxy instance
      *
@@ -267,6 +268,9 @@ public class Proxy implements java.io.Serializable {
     }
 
     /**
+     *
+     * 获得一个代理类
+     *
      * Returns the {@code java.lang.Class} object for a proxy class
      * given a class loader and an array of interfaces.  The proxy class
      * will be defined by the specified class loader and will implement
@@ -330,8 +334,8 @@ public class Proxy implements java.io.Serializable {
      * of interfaces but in a different order will result in two distinct
      * proxy classes.
      *
-     * @param   loader the class loader to define the proxy class
-     * @param   interfaces the list of interfaces for the proxy class
+     * @param   loader the class loader to define the proxy class 类装载器
+     * @param   interfaces the list of interfaces for the proxy class 真实类所拥有的全部接口的数组
      *          to implement
      * @return  a proxy class that is defined in the specified class loader
      *          and that implements the specified interfaces
@@ -635,6 +639,7 @@ public class Proxy implements java.io.Serializable {
 
             /*
              * Generate the specified proxy class.
+             * 生成字节码
              */
             byte[] proxyClassFile = ProxyGenerator.generateProxyClass(
                 proxyName, interfaces, accessFlags);
@@ -655,6 +660,14 @@ public class Proxy implements java.io.Serializable {
     }
 
     /**
+     * 所谓DynamicProxy是这样一种class：它是在运行时生成的class，在生成它时你必须提供一组interface给它，然后该class就宣称它实现了这些 interface。
+     * 你当然可以把该class的实例当作这些interface中的任何一个来用。
+     * 当然，这个DynamicProxy其实就是一个Proxy，它不会替你作实质性的工作，在生成它的实例时你必须提供一个handler，由它接管实际的工作。
+     * 在使用动态代理类时，我们必须实现InvocationHandler接口
+     * 当代理对象调用真实对象的方法时，其会自动的跳转到代理对象关联的handler对象的invoke方法来进行调用。
+     *
+     * 返回代理类的一个实例，返回后的代理类可以当作被代理类使用
+     *
      * Returns an instance of a proxy class for the specified interfaces
      * that dispatches method invocations to the specified invocation
      * handler.
@@ -705,6 +718,7 @@ public class Proxy implements java.io.Serializable {
                                           InvocationHandler h)
         throws IllegalArgumentException
     {
+        //检查h 不为空，否则抛异常
         Objects.requireNonNull(h);
 
         final Class<?>[] intfs = interfaces.clone();
@@ -715,17 +729,19 @@ public class Proxy implements java.io.Serializable {
 
         /*
          * Look up or generate the designated proxy class.
+         * 获得与指定类装载器和一组接口相关的代理类类型对象
          */
         Class<?> cl = getProxyClass0(loader, intfs);
 
         /*
          * Invoke its constructor with the designated invocation handler.
+         * 通过反射获取构造函数对象并生成代理类实例
          */
         try {
             if (sm != null) {
                 checkNewProxyPermission(Reflection.getCallerClass(), cl);
             }
-
+            // 获取代理对象的构造方法（也就是$Proxy0(InvocationHandler h)）
             final Constructor<?> cons = cl.getConstructor(constructorParams);
             final InvocationHandler ih = h;
             if (!Modifier.isPublic(cl.getModifiers())) {
@@ -736,6 +752,7 @@ public class Proxy implements java.io.Serializable {
                     }
                 });
             }
+            // 生成代理类的实例并把InvocationHandlerImpl的实例传给它的构造方法
             return cons.newInstance(new Object[]{h});
         } catch (IllegalAccessException|InstantiationException e) {
             throw new InternalError(e.toString(), e);

@@ -82,12 +82,14 @@ public class ThreadLocal<T> {
      * are used by the same threads, while remaining well-behaved in
      * less common cases.
      */
+    // threadLocalHashCode应该是ThreadLocal的散列值，定义为final，表示ThreadLocal一旦创建其散列值就已经确定了，生成过程则是调用nextHashCode()：
     private final int threadLocalHashCode = nextHashCode();
 
     /**
      * The next hash code to be given out. Updated atomically. Starts at
      * zero.
      */
+    // nextHashCode表示分配下一个ThreadLocal实例的threadLocalHashCode的值
     private static AtomicInteger nextHashCode =
         new AtomicInteger();
 
@@ -96,6 +98,8 @@ public class ThreadLocal<T> {
      * implicit sequential thread-local IDs into near-optimally spread
      * multiplicative hash values for power-of-two-sized tables.
      */
+    // HASH_INCREMENT则表示分配两个ThradLocal实例的threadLocalHashCode的增量
+    // 生成hash code间隙为这个魔数，可以让生成出来的值或者说ThreadLocal的ID较为均匀地分布在2的幂大小的数组中。
     private static final int HASH_INCREMENT = 0x61c88647;
 
     /**
@@ -157,9 +161,12 @@ public class ThreadLocal<T> {
      * @return the current thread's value of this thread-local
      */
     public T get() {
+        // 获取当前线程
         Thread t = Thread.currentThread();
+        // 获取当前线程的ThreadLocal.ThreadLocalMap
         ThreadLocalMap map = getMap(t);
         if (map != null) {
+            // 获取到ThreadLocalMap，根据当前ThreadLocal获取对应的Entry
             ThreadLocalMap.Entry e = map.getEntry(this);
             if (e != null) {
                 @SuppressWarnings("unchecked")
@@ -177,7 +184,9 @@ public class ThreadLocal<T> {
      * @return the initial value
      */
     private T setInitialValue() {
+        // 初始化值
         T value = initialValue();
+        // 获取当前线程的ThreadLocalMap
         Thread t = Thread.currentThread();
         ThreadLocalMap map = getMap(t);
         if (map != null)
@@ -317,27 +326,32 @@ public class ThreadLocal<T> {
 
         /**
          * The initial capacity -- MUST be a power of two.
+         * 初始容量，必须为2的幂
          */
         private static final int INITIAL_CAPACITY = 16;
 
         /**
          * The table, resized as necessary.
          * table.length MUST always be a power of two.
+         * Entry表，大小必须为2的幂
          */
         private Entry[] table;
 
         /**
          * The number of entries in the table.
+         * 表里entry的个数
          */
         private int size = 0;
 
         /**
          * The next size value at which to resize.
+         * 重新分配表大小的阈值，默认为0
          */
         private int threshold; // Default to 0
 
         /**
          * Set the resize threshold to maintain at worst a 2/3 load factor.
+         * 设置resize阈值以维持最坏2/3的装载因子
          */
         private void setThreshold(int len) {
             threshold = len * 2 / 3;
@@ -345,6 +359,7 @@ public class ThreadLocal<T> {
 
         /**
          * Increment i modulo len.
+         * 环形意义的下一个索引
          */
         private static int nextIndex(int i, int len) {
             return ((i + 1 < len) ? i + 1 : 0);
@@ -352,6 +367,7 @@ public class ThreadLocal<T> {
 
         /**
          * Decrement i modulo len.
+         * 环形意义的上一个索引
          */
         private static int prevIndex(int i, int len) {
             return ((i - 1 >= 0) ? i - 1 : len - 1);
@@ -361,12 +377,19 @@ public class ThreadLocal<T> {
          * Construct a new map initially containing (firstKey, firstValue).
          * ThreadLocalMaps are constructed lazily, so we only create
          * one when we have at least one entry to put in it.
+         * 构造一个包含firstKey和firstValue的map。
+         * ThreadLocalMap是惰性构造的，所以只有当至少要往里面放一个元素的时候才会构建它。
          */
         ThreadLocalMap(ThreadLocal<?> firstKey, Object firstValue) {
+            // 初始化table数组
             table = new Entry[INITIAL_CAPACITY];
+            // 用firstKey的threadLocalHashCode与初始大小16取模得到哈希值
             int i = firstKey.threadLocalHashCode & (INITIAL_CAPACITY - 1);
+            // 初始化该节点
             table[i] = new Entry(firstKey, firstValue);
+            // 设置节点表大小为1
             size = 1;
+            // 设定扩容阈值
             setThreshold(INITIAL_CAPACITY);
         }
 
@@ -410,11 +433,14 @@ public class ThreadLocal<T> {
          * @return the entry associated with key, or null if no such
          */
         private Entry getEntry(ThreadLocal<?> key) {
+            // 根据key这个ThreadLocal的ID来获取索引，也即哈希值
             int i = key.threadLocalHashCode & (table.length - 1);
             Entry e = table[i];
+            // 对应的entry存在且未失效且弱引用指向的ThreadLocal就是key，则命中返回
             if (e != null && e.get() == key)
                 return e;
             else
+                // 因为用的是线性探测，所以往后找还是有可能能够找到目标Entry的。
                 return getEntryAfterMiss(key, i, e);
         }
 
@@ -426,18 +452,23 @@ public class ThreadLocal<T> {
          * @param  i the table index for key's hash code
          * @param  e the entry at table[i]
          * @return the entry associated with key, or null if no such
+         * 调用getEntry未直接命中的时候调用此方法
          */
         private Entry getEntryAfterMiss(ThreadLocal<?> key, int i, Entry e) {
             Entry[] tab = table;
             int len = tab.length;
 
+            // 基于线性探测法不断向后探测直到遇到空entry。
             while (e != null) {
                 ThreadLocal<?> k = e.get();
+                // 找到目标
                 if (k == key)
                     return e;
                 if (k == null)
+                    // 该entry对应的ThreadLocal已经被回收，调用expungeStaleEntry来清理无效的entry
                     expungeStaleEntry(i);
                 else
+                    // 环形意义下往后面走
                     i = nextIndex(i, len);
                 e = tab[i];
             }
@@ -459,32 +490,38 @@ public class ThreadLocal<T> {
 
             Entry[] tab = table;
             int len = tab.length;
-            int i = key.threadLocalHashCode & (len-1);
 
+            // 根据 ThreadLocal 的散列值，查找对应元素在数组中的位置
+            int i = key.threadLocalHashCode & (len-1);
+            // 采用“线性探测法”，寻找合适位置
             for (Entry e = tab[i];
                  e != null;
                  e = tab[i = nextIndex(i, len)]) {
                 ThreadLocal<?> k = e.get();
-
+                // key 存在，直接覆盖
                 if (k == key) {
                     e.value = value;
                     return;
                 }
-
+                // key == null，但是存在值（因为此处的e != null），说明之前的ThreadLocal对象已经被回收了
                 if (k == null) {
+                    // 用新元素替换陈旧的元素(当前索引往前探索，替换最前面已失效key对应的索引位置的entry)
                     replaceStaleEntry(key, value, i);
                     return;
                 }
             }
-
+            // ThreadLocal对应的key实例不存在也没有陈旧元素，new 一个
             tab[i] = new Entry(key, value);
             int sz = ++size;
+            // cleanSomeSlots 清楚陈旧的Entry（key == null）
+            // 如果没有清理陈旧的 Entry 并且数组中的元素大于了阈值，则进行 rehash
             if (!cleanSomeSlots(i, sz) && sz >= threshold)
                 rehash();
         }
 
         /**
          * Remove the entry for key.
+         * 从map中删除ThreadLocal
          */
         private void remove(ThreadLocal<?> key) {
             Entry[] tab = table;
@@ -494,7 +531,9 @@ public class ThreadLocal<T> {
                  e != null;
                  e = tab[i = nextIndex(i, len)]) {
                 if (e.get() == key) {
+                    // 显式断开弱引用
                     e.clear();
+                    // 进行段清理
                     expungeStaleEntry(i);
                     return;
                 }
@@ -526,6 +565,7 @@ public class ThreadLocal<T> {
             // We clean out whole runs at a time to avoid continual
             // incremental rehashing due to garbage collector freeing
             // up refs in bunches (i.e., whenever the collector runs).
+            // 向前扫描，查找最前的一个无效slot
             int slotToExpunge = staleSlot;
             for (int i = prevIndex(staleSlot, len);
                  (e = tab[i]) != null;
@@ -535,6 +575,7 @@ public class ThreadLocal<T> {
 
             // Find either the key or trailing null slot of run, whichever
             // occurs first
+            // 继续向后扫描table，查找是否已经有对应key
             for (int i = nextIndex(staleSlot, len);
                  (e = tab[i]) != null;
                  i = nextIndex(i, len)) {
@@ -545,15 +586,25 @@ public class ThreadLocal<T> {
                 // The newly stale slot, or any other stale slot
                 // encountered above it, can then be sent to expungeStaleEntry
                 // to remove or rehash all of the other entries in run.
+                // 找到了key，将其与无效的slot交换
                 if (k == key) {
+                    // 更新对应slot的value值
                     e.value = value;
-
+                    // 将第一个发现的失效key的Entry，指向后面扫描找到的对应key的Entry，相互替换
                     tab[i] = tab[staleSlot];
                     tab[staleSlot] = e;
 
                     // Start expunge at preceding stale entry if it exists
+                    /*
+                     * 如果在整个扫描过程中（包括函数一开始的向前扫描与i之前的向后扫描）
+                     * 找到了之前的无效slot则以那个位置作为清理的起点，
+                     * 否则则以当前的i作为清理起点
+                     */
+                    // 如果向前扫描没有发现失效的key则此处相等
                     if (slotToExpunge == staleSlot)
+                        // 此时i处为失效key的索引
                         slotToExpunge = i;
+                    // 从slotToExpunge开始做一次连续段的清理，再做一次启发式清理
                     cleanSomeSlots(expungeStaleEntry(slotToExpunge), len);
                     return;
                 }
@@ -562,6 +613,7 @@ public class ThreadLocal<T> {
                 // first stale entry seen while scanning for key is the
                 // first still present in the run.
                 if (k == null && slotToExpunge == staleSlot)
+                    // 如果向前扫描没有发现失效的key则此处相等，向后扫描发现失效key的entry，将当前索引给slotToExpunge
                     slotToExpunge = i;
             }
 
@@ -570,6 +622,8 @@ public class ThreadLocal<T> {
             tab[staleSlot] = new Entry(key, value);
 
             // If there are any other stale entries in run, expunge them
+            // 在探测过程中如果发现任何无效slot，则做一次清理（连续段清理+启发式清理），
+            // 此处不相等则向前扫描没有找到失效的key，向后扫描找到了失效的key并且slotToExpunge为扫描到到第一个失效到entry的索引
             if (slotToExpunge != staleSlot)
                 cleanSomeSlots(expungeStaleEntry(slotToExpunge), len);
         }
@@ -585,12 +639,15 @@ public class ThreadLocal<T> {
          * (all between staleSlot and this slot will have been checked
          * for expunging).
          */
+        // 清理staleSlot索引以及其之后失效了key的entry，并对所有未失效的entry根据key重新进行hash放入新的索引位置
         private int expungeStaleEntry(int staleSlot) {
             Entry[] tab = table;
             int len = tab.length;
 
             // expunge entry at staleSlot
+            // 因为entry对应的ThreadLocal已经被回收，value设为null，显式断开强引用
             tab[staleSlot].value = null;
+            // 显式设置该entry为null，以便垃圾回收
             tab[staleSlot] = null;
             size--;
 
@@ -601,11 +658,18 @@ public class ThreadLocal<T> {
                  (e = tab[i]) != null;
                  i = nextIndex(i, len)) {
                 ThreadLocal<?> k = e.get();
+                // 清理对应ThreadLocal已经被回收的entry
                 if (k == null) {
                     e.value = null;
                     tab[i] = null;
                     size--;
                 } else {
+                    /*
+                     * 对于还没有被回收的情况，需要做一次rehash。
+                     *
+                     * 如果对应的ThreadLocal的ID对len取模出来的索引h不为当前位置i，
+                     * 则从h向后线性探测到第一个空的slot，把当前的entry给挪过去。
+                     */
                     int h = k.threadLocalHashCode & (len - 1);
                     if (h != i) {
                         tab[i] = null;
@@ -618,6 +682,7 @@ public class ThreadLocal<T> {
                     }
                 }
             }
+            // 返回staleSlot之后第一个空的slot索引
             return i;
         }
 
@@ -644,6 +709,18 @@ public class ThreadLocal<T> {
          * seems to work well.)
          *
          * @return true if any stale entries have been removed.
+         *
+         *  启发式地清理slot,
+         *  i对应entry是非无效（指向的ThreadLocal没被回收，或者entry本身为空）
+         *  n是用于控制扫描次数的
+         *  正常情况下如果log n次扫描没有发现无效slot，函数就结束了
+         *  但是如果发现了无效的slot，将n置为table的长度len，做一次连续段的清理
+         *  再从下一个空的slot开始继续扫描
+         *  这个函数有两处地方会被调用，一处是插入的时候可能会被调用，另外个是在替换无效slot的时候可能会被调用，
+         *  区别是前者传入的n为元素个数，后者为table的容量
+         *
+         *  n的用途：主要用于扫描控制（scan control），从while中是通过n来进行条件判断的说明n就是用来控制扫描趟数（循环次数）的。
+         *  在扫描过程中，如果没有遇到脏entry就整个扫描过程持续log2(n)次。如果在扫描过程中遇到脏entry的话就会令n为当前hash表的长度（n=len），再扫描log2(n)次
          */
         private boolean cleanSomeSlots(int i, int n) {
             boolean removed = false;
@@ -652,9 +729,11 @@ public class ThreadLocal<T> {
             do {
                 i = nextIndex(i, len);
                 Entry e = tab[i];
+                // 扩大扫描控制因子
                 if (e != null && e.get() == null) {
                     n = len;
                     removed = true;
+                    // 清理一个连续段
                     i = expungeStaleEntry(i);
                 }
             } while ( (n >>>= 1) != 0);
@@ -667,15 +746,22 @@ public class ThreadLocal<T> {
          * shrink the size of the table, double the table size.
          */
         private void rehash() {
+            // 做一次全量清理
             expungeStaleEntries();
 
             // Use lower threshold for doubling to avoid hysteresis
+            /*
+             * 因为做了一次清理，所以size很可能会变小。
+             * ThreadLocalMap这里的实现是调低阈值来判断是否需要扩容，
+             * threshold默认为len*2/3，所以这里的threshold - threshold / 4相当于len/2
+             */
             if (size >= threshold - threshold / 4)
                 resize();
         }
 
         /**
          * Double the capacity of the table.
+         * 扩容，因为需要保证table的容量len为2的幂，所以扩容即扩大2倍
          */
         private void resize() {
             Entry[] oldTab = table;
@@ -706,6 +792,7 @@ public class ThreadLocal<T> {
 
         /**
          * Expunge all stale entries in the table.
+         * 做一次全量清理
          */
         private void expungeStaleEntries() {
             Entry[] tab = table;
